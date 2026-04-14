@@ -18,6 +18,17 @@ const createBooking = async (req, res) => {
         message: "Guests must be at least 1",
       });
     }
+    
+    const existingBooking = await Booking.findOne({
+      user: req.user.id,
+      tour: tour,
+    });
+    if (existingBooking) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already booked this tour",
+      });
+    }
     // check tour
     const tourData = await Tour.findById(tour);
     if (!tourData) {
@@ -97,6 +108,26 @@ const getBooking = async (req, res) => {
   }
 };
 
+// get my booking
+const getMyBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.user.id }).populate(
+      "tour",
+      "title price images",
+    );
+
+    res.status(200).json({
+      success: true,
+      data: bookings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // update booking
 const updateBooking = async (req, res) => {
   try {
@@ -151,6 +182,7 @@ module.exports = {
   createBooking,
   getBookings,
   getBooking,
+  getMyBookings,
   updateBooking,
   deleteBooking,
 };
