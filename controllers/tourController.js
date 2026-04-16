@@ -48,7 +48,7 @@ const createTour = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      
+
       message: "Tour created successfully",
       data: tour,
     });
@@ -63,6 +63,13 @@ const createTour = async (req, res) => {
 // Get all Tours
 const getTours = async (req, res) => {
   try {
+    const { search } = req.query;
+    let query = {};
+
+    // search by title (case-insensitive)
+    if (search) {
+      query.title = { $regex: search, $option: "i" };
+    }
     const tours = await Tour.find().populate("createdBy", "name email");
     res.status(200).json({
       success: true,

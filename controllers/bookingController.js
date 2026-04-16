@@ -18,7 +18,7 @@ const createBooking = async (req, res) => {
         message: "Guests must be at least 1",
       });
     }
-    
+
     const existingBooking = await Booking.findOne({
       user: req.user.id,
       tour: tour,
@@ -47,6 +47,7 @@ const createBooking = async (req, res) => {
       guests,
       tourPrice,
       totalPrice,
+      status: "pending",
     });
 
     res.status(201).json({
@@ -128,15 +129,14 @@ const getMyBookings = async (req, res) => {
   }
 };
 
-// update booking
-const updateBooking = async (req, res) => {
+// approve booking
+const approveBooking = async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    })
-      .populate("user", "name email")
-      .populate("tour", "title price");
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status: "approved" },
+      { new: true },
+    );
 
     if (!booking) {
       return res.status(404).json({
@@ -144,9 +144,84 @@ const updateBooking = async (req, res) => {
         message: "Booking not found",
       });
     }
+
     res.status(200).json({
       success: true,
+      message: "Booking approved",
       data: booking,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// reject booking
+const rejectBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status: "rejected" },
+      { new: true },
+    );
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Booking rejected",
+      data: booking,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// update booking
+const updateBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    // Check ownership (or admin)
+    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this booking",
+      });
+    }
+
+    if (booking.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot modify booking after approval",
+      });
+    }
+
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+      },
+    )
+      .populate("user", "name email")
+      .populate("tour", "title price");
+
+    res.status(200).json({
+      success: true,
+      data: updatedBooking,
     });
   } catch (error) {
     res.status(500).json({
@@ -159,13 +234,31 @@ const updateBooking = async (req, res) => {
 // Delete Booking
 const deleteBooking = async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndDelete(req.params.id);
+    const booking = await Booking.findById(req.params.id);
+
     if (!booking) {
       return res.status(404).json({
         success: false,
         message: "Booking not found",
       });
     }
+
+    // Check ownership (or admin)
+    if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to delete this booking",
+      });
+    }
+    if (booking.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot modify booking after approval",
+      });
+    }
+
+    await booking.deleteOne();
+
     res.status(200).json({
       success: true,
       message: "Booking deleted successfully",
@@ -183,6 +276,8 @@ module.exports = {
   getBookings,
   getBooking,
   getMyBookings,
+  approveBooking,
+  rejectBooking,
   updateBooking,
   deleteBooking,
 };
