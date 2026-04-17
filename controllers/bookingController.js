@@ -136,7 +136,9 @@ const approveBooking = async (req, res) => {
       req.params.id,
       { status: "approved" },
       { new: true },
-    );
+    )
+      .populate("user", "name email")
+      .populate("tour", "title price");
 
     if (!booking) {
       return res.status(404).json({
@@ -162,7 +164,9 @@ const rejectBooking = async (req, res) => {
       req.params.id,
       { status: "rejected" },
       { new: true },
-    );
+    )
+      .populate("user", "name email")
+      .populate("tour", "title price");
 
     if (!booking) {
       return res.status(404).json({
@@ -181,6 +185,42 @@ const rejectBooking = async (req, res) => {
   }
 };
 
+// Complete booking
+const completeBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate("user", "name email")
+      .populate("tour", "title price");
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    if (booking.status !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Only approved bookings can be completed",
+      });
+    }
+
+    booking.status = "completed";
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      data: booking,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // update booking
 const updateBooking = async (req, res) => {
   try {
@@ -193,7 +233,7 @@ const updateBooking = async (req, res) => {
       });
     }
 
-    // Check ownership (or admin)
+    // Check ownership
     if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
@@ -208,13 +248,19 @@ const updateBooking = async (req, res) => {
       });
     }
 
+    const { guests } = req.body;
+
+    const tour = await Tour.findById(booking.tour);
+
+    const totalPrice = guests * tour.price;
+
     const updatedBooking = await Booking.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      { guests, totalPrice },
       {
         new: true,
         runValidators: true,
-      },
+      }
     )
       .populate("user", "name email")
       .populate("tour", "title price");
@@ -250,10 +296,10 @@ const deleteBooking = async (req, res) => {
         message: "Not authorized to delete this booking",
       });
     }
-    if (booking.status !== "pending") {
+    if (booking.status !== "rejected" && booking.status !== "completed") {
       return res.status(400).json({
         success: false,
-        message: "Cannot modify booking after approval",
+        message: "Only rejected or completed bookings can be deleted",
       });
     }
 
@@ -278,6 +324,7 @@ module.exports = {
   getMyBookings,
   approveBooking,
   rejectBooking,
+  completeBooking,
   updateBooking,
   deleteBooking,
 };

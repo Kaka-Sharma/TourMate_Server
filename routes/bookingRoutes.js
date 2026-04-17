@@ -11,6 +11,7 @@ const {
   getMyBookings,
   approveBooking,
   rejectBooking,
+  completeBooking,
   updateBooking,
   deleteBooking,
 } = bookingController;
@@ -29,6 +30,9 @@ router.get("/:id", protect, getBooking);
 
 // approve booking
 router.put("/:id/approve", protect, admin, approveBooking);
+
+// complete booking
+router.put("/:id/complete", protect, admin, completeBooking);
 
 // reject booking
 router.put("/:id/reject", protect, admin, rejectBooking);

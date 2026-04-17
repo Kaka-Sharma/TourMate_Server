@@ -63,17 +63,30 @@ const createTour = async (req, res) => {
 // Get all Tours
 const getTours = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page = 1, limit = 9 } = req.query;
+
     let query = {};
 
-    // search by title (case-insensitive)
     if (search) {
-      query.title = { $regex: search, $option: "i" };
+      query.title = { $regex: search, $options: "i" };
     }
-    const tours = await Tour.find().populate("createdBy", "name email");
+
+    const skip = (page - 1) * limit;
+
+    const total = await Tour.countDocuments(query);
+
+    const tours = await Tour.find(query)
+      .populate("createdBy", "name email")
+      .skip(skip)
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
+
     res.status(200).json({
       success: true,
       count: tours.length,
+      total, 
+      currentPage: Number(page),
+      totalPages: Math.ceil(total / limit),
       data: tours,
     });
   } catch (error) {
@@ -112,10 +125,23 @@ const getTour = async (req, res) => {
 // get Popular tour
 const getPopularTours = async (req, res) => {
   try {
-    const tours = await Tour.find({ isPopular: true }).limit(6);
+    const { page = 1, limit = 8 } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    const total = await Tour.countDocuments({ isPopular: true });
+
+    const tours = await Tour.find({ isPopular: true })
+      .skip(skip)
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
+
     res.status(200).json({
       success: true,
       count: tours.length,
+      total,
+      currentPage: Number(page),
+      totalPages: Math.ceil(total / limit),
       data: tours,
     });
   } catch (error) {
